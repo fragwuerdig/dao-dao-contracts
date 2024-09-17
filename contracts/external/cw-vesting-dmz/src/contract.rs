@@ -36,12 +36,11 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     set_managed_denom(deps.storage, msg.managed_denom)?;
     set_managed_balance(deps.storage, Uint128::zero())?;
-    validate_weights(msg.weights.clone())?;
-    set_weights(deps.storage, msg.weights)?;
-    validate_admin(deps.as_ref(), msg.admin.clone())?;
+    set_weights(deps.storage, deps.api, msg.weights)?;
+    validate_admin(deps.api, msg.admin.clone())?;
     match msg.admin {
-        Some(admin) => set_admin(deps, Some(admin))?,
-        None => set_admin(deps, Some(info.sender.into_string()))?,
+        Some(admin) => set_admin(deps.storage, deps.api, Some(admin))?,
+        None => set_admin(deps.storage, deps.api, Some(info.sender.into_string()))?,
     }
 
     Ok(Response::new())
@@ -83,7 +82,7 @@ pub fn execute_update_claims(
     assert_admin(deps.storage, info.sender.into_string())?;
 
     // 2nd) get the current balance and the managed balance
-    let balance = get_current_balance(deps.as_ref(), env)?;
+    let balance = get_current_balance(deps.storage, deps.querier, env)?;
     let managed_balance = get_managed_balance(deps.storage)?;
 
     // 3rd) set managed balance to the actual balance
@@ -107,7 +106,7 @@ pub fn execute_update_claims(
     let shares = split_number_with_weights(diff_balance, weights)?;
     // -> increase all balances with the difference
     for (address, share) in shares {
-        add_balance(deps.storage, address, share)?;
+        add_balance(deps.storage, deps.api, address, share)?;
     }
 
     // 6th) we need to correct rounding errors - if the sum of the shares is
@@ -116,14 +115,14 @@ pub fn execute_update_claims(
     // address with the highest balance so that the impact of the roundig error
     // is minimized
     let sum_of_balances = sum_balances(deps.storage)?;
-    let actual_balance = get_managed_balance(deps.storage)?;
+    let actual_balance = balance.clone();
     let max_balance_acc = get_max_balance_account(deps.storage)?;
     if actual_balance.gt(&sum_of_balances) {
         let diff = actual_balance.checked_sub(sum_of_balances).unwrap();
-        add_balance(deps.storage, max_balance_acc, diff)?;
+        add_balance(deps.storage, deps.api, max_balance_acc, diff)?;
     } else if actual_balance.lt(&sum_of_balances) {
         let diff = sum_of_balances.checked_sub(actual_balance).unwrap();
-        reduce_balance(deps.storage, max_balance_acc, diff)?;
+        reduce_balance(deps.storage, deps.api, max_balance_acc, diff)?;
     }
 
     Ok(Response::new())
@@ -140,10 +139,10 @@ pub fn execute_withdraw(
     reduce_managed_balance(deps.storage, withdraw_amount)?;
 
     // 2nd decrease the balance of the address to zero
-    reduce_balance(deps.storage, address.clone(), withdraw_amount)?;
+    reduce_balance(deps.storage, deps.api, address.clone(), withdraw_amount)?;
 
     // 3rd increase the claimed amount of the address by the balance of the address
-    add_claimed(deps.storage, address.clone(), withdraw_amount)?;
+    add_claimed(deps.storage, deps.api, address.clone(), withdraw_amount)?;
 
     // 4th emit message to send the withdrawn amount to the address
     let recipient = deps.api.addr_validate(&address)?;
@@ -161,7 +160,7 @@ pub fn execute_set_admin(
     assert_admin(deps.storage, info.sender.into_string())?;
 
     // 2nd) set the new admin
-    set_admin(deps, Some(address))?;
+    set_admin(deps.storage, deps.api, Some(address))?;
 
     Ok(Response::new())
 }
