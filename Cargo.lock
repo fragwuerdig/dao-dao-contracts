@@ -1192,6 +1192,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-vesting-dmz"
+version = "2.5.0"
+dependencies = [
+ "anyhow",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-denom 2.5.0",
+ "cw-multi-test",
+ "cw-paginate-storage 2.5.0",
+ "cw-stake-tracker",
+ "cw-storage-plus 1.2.0",
+ "cw-utils 1.0.3",
+ "cw-wormhole",
+ "cw2 1.1.2",
+ "cw20 1.1.2",
+ "cw20-base 1.1.2",
+ "dao-testing",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-wormhole"
 version = "2.5.0"
 dependencies = [
