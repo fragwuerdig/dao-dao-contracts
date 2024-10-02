@@ -136,6 +136,11 @@ pub fn execute_withdraw(
 ) -> Result<Response, ContractError> {
     // 1st decrease the managed balance by the balance of the address
     let withdraw_amount = get_balance(deps.storage, address.clone())?;
+    if withdraw_amount.is_zero() {
+        return Err(ContractError::Std(StdError::generic_err(
+            "No balance to withdraw",
+        )));
+    }
     reduce_managed_balance(deps.storage, withdraw_amount)?;
 
     // 2nd decrease the balance of the address to zero
@@ -412,6 +417,13 @@ mod test {
         assert_eq!(Uint128::from(177_600_000u32), balance);
         let managed_balance = super::get_managed_balance(deps.as_ref().storage).unwrap();
         assert_eq!(Uint128::from(399_600_000u32), managed_balance);
+
+        // check failed withdraw on zero balance
+        let info = mock_info("addr0000", &[]);
+        let res = super::execute_withdraw(deps.as_mut(), env.clone(), info, "addr0000".to_string()).unwrap_err();
+        assert_eq!(res, ContractError::Std(cosmwasm_std::StdError::GenericErr {
+            msg: "No balance to withdraw".into()
+        }));
     }
 
     #[test]
