@@ -241,6 +241,7 @@ pub struct MigrateWithdrawBalance {
     pub recipient: String,
 }
 
+#[cw_serde]
 pub struct MigrateMsg {
     pub withdraw: Option<MigrateWithdrawBalance>,
 }
