@@ -60,3 +60,10 @@ pub struct InstantiateMsg {
     pub weights: Vec<(String, Decimal)>,
     pub admin: Option<String>,
 }
+
+#[cw_serde]
+pub struct MigrateMsg {
+    // if set - migrate to new weights if nothing
+    // has been claimed yet
+    pub weights: Option<Vec<(String, Decimal)>>,
+}

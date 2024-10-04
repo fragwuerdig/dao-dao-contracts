@@ -1,14 +1,16 @@
 use crate::contract::instantiate;
 use crate::error::ContractError;
 use crate::msg::InstantiateMsg;
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::Env;
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, BankQuery, ContractResult, DepsMut, Empty, MemoryStorage,
     OwnedDeps, QuerierResult, Uint128, WasmQuery,
 };
 use cw20::{BalanceResponse, Cw20QueryMsg};
+
+#[cfg(test)]
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage};
 
 #[cfg(test)]
 const MOCK_BALANCES: [(&str, Uint128); 4] = [
