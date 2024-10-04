@@ -15,12 +15,46 @@ use cw_ownable::OwnershipError;
 use cw_utils::{must_pay, nonpayable};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, MigrateMsg};
 use crate::state::{PAYMENT, UNBONDING_DURATION_SECONDS};
 use crate::vesting::{Status, VestInit};
 
 const CONTRACT_NAME: &str = "crates.io:cw-vesting";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    msg: MigrateMsg
+) -> Result<Response, ContractError> {
+
+    match msg.withdraw {
+        Some(withdraw) => {
+            let amount = withdraw.amount;
+            let recipient = deps.api.addr_validate(&withdraw.recipient)?;
+            let vest = PAYMENT.get_vest(deps.storage)?;
+            let denom = vest.denom.clone();
+            let my_balance = denom.query_balance(&deps.querier, &env.contract.address)?;
+
+            // what is the balance after withdrawal?
+            let diff = my_balance
+                .checked_sub(amount)
+                .map_err(|_| ContractError::Std(cosmwasm_std::StdError::GenericErr { msg: "overflow error".to_string() }))?;
+
+            // assert the balance is sufficient to fulfill the vest
+            if diff < vest.total() {
+                return Err(ContractError::Std(cosmwasm_std::StdError::GenericErr { msg: "insufficient balance".to_string() }));
+            }
+
+            let msg = denom.get_transfer_to_message(&recipient, amount)?;
+            Ok(Response::new().add_message(msg))
+
+        },
+        None => { Ok(Response::new()) }
+    }
+
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
