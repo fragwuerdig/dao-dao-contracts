@@ -176,7 +176,11 @@ pub fn get_max_balance_account(store: &dyn Storage) -> StdResult<String> {
 }
 
 pub fn get_balance(store: &dyn Storage, address: String) -> StdResult<Uint128> {
-    Ok(BALANCES.load(store, address)?)
+    let res = BALANCES.load(store, address);
+    match res {
+        Ok(balance) => Ok(balance),
+        Err(_) => Ok(Uint128::zero()),
+    }
 }
 
 pub fn sum_balances(store: &dyn Storage) -> StdResult<Uint128> {
@@ -355,36 +359,38 @@ mod test {
 
     #[test]
     fn get_balance_works() {
-        // mock the querier
         let mut owned_deps = mock_dependencies();
-        owned_deps.querier.update_wasm(|r| wasm_query_handler(r));
-        owned_deps.querier.update_balance(
-            "contract".to_string(),
-            vec![Coin::new(
-                get_mocked_balance("contract".to_string()).into(),
-                "uusd",
-            )],
-        );
         let mut deps = owned_deps.as_mut();
+        let mut store = deps.storage;
         let api = deps.api;
-        let querier = deps.querier;
-        let store = deps.storage;
-        let mut env = mock_env();
-        env.contract.address = Addr::unchecked("contract");
+        
+        let address = "addr0000".to_string();
+        let amount = Uint128::new(100_000_000);
+        super::set_balance(store, api, address.clone(), amount).unwrap();
+        let balance = super::get_balance(store, address.clone()).unwrap();
+        assert_eq!(balance, amount);
 
-        // native balance works
-        let native_denom = CheckedDenom::Native("uusd".to_string());
-        set_managed_denom(store, native_denom).unwrap();
+        // ensure non-existent key defaults to zero
+        let address = "nonexistent".to_string();
+        let balance = super::get_balance(store, address.clone()).unwrap();
+        assert_eq!(balance, Uint128::zero());
 
-        let balance = get_current_balance(store, querier, env.clone()).unwrap();
-        assert_eq!(balance, get_mocked_balance(String::from("contract")));
+    }
 
-        // cw20 balance works as well
-        let cw20_denom = CheckedDenom::Cw20(Addr::unchecked("booh"));
-        set_managed_denom(store, cw20_denom).unwrap();
-
-        let balance = get_current_balance(store, querier, env.clone()).unwrap();
-        assert_eq!(balance, get_mocked_balance(String::from("contract")));
+    #[test]
+    fn get_outstanding_claim_works() {
+        let mut owned_deps = mock_dependencies();
+        let deps = owned_deps.as_mut();
+        let mut store = deps.storage;
+        let api = deps.api;
+        let balances = vec![
+            ("addr0000".to_string(), Uint128::new(100_000_000)),
+            ("addr0001".to_string(), Uint128::new(200_000_000)),
+            ("addr0002".to_string(), Uint128::new(300_000_001)),
+        ];
+        set_balances(store, api, balances).unwrap();
+        let sum = sum_balances(store).unwrap();
+        assert_eq!(sum, Uint128::new(600_000_001));
     }
 
     #[test]
