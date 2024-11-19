@@ -32,6 +32,7 @@ pub fn split_number_with_weights(
         .collect()
 }
 
+#[cfg(test)]
 mod test {
 
     use super::*;

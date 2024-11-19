@@ -234,3 +234,14 @@ pub enum QueryMsg {
     #[returns(::cosmwasm_std::Uint128)]
     Stake(StakeTrackerQuery),
 }
+
+#[cw_serde]
+pub struct MigrateWithdrawBalance {
+    pub amount: Uint128,
+    pub recipient: String,
+}
+
+#[cw_serde]
+pub struct MigrateMsg {
+    pub withdraw: Option<MigrateWithdrawBalance>,
+}

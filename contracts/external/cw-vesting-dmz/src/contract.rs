@@ -5,7 +5,7 @@ use std::result::Result;
 use crate::error::ContractError;
 use crate::msg::{
     ExecuteMsg, InstantiateMsg, QueryManagedDenomResponse, QueryMsg, QueryPendingClaimResponse,
-    QueryPendingClaimsResponse,
+    QueryPendingClaimsResponse, MigrateMsg,
 };
 use crate::state::{
     add_balance, add_claimed, assert_admin, get_admin, get_balance, get_balances, get_claimed,
@@ -25,6 +25,32 @@ use cw2::set_contract_version;
 
 const CONTRACT_NAME: &str = "crates.io:cw-vesting-dmz";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[entry_point]
+pub fn migrate(
+    deps: DepsMut,
+    env: Env,
+    msg: MigrateMsg
+) -> Result<Response, ContractError> {
+
+    match msg.weights {
+        Some(weights) => {
+            let mut store = deps.storage;
+            let total_claimed = get_total_claimed(store)?;
+            if !total_claimed.is_zero() {
+                return Err(ContractError::Std(StdError::generic_err("Cannot migrate to new weights with executed claims")));
+            }
+            let managed_bal = get_managed_balance(store)?;
+            if !managed_bal.is_zero() {
+                return Err(ContractError::Std(StdError::generic_err("Cannot migrate to new weights with managed balance")));
+            }
+            set_weights(store, deps.api, weights)?;
+        },
+        None => {}
+    }
+    
+    Ok(Response::new())
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -218,9 +244,11 @@ pub fn query_denom(deps: Deps) -> StdResult<Binary> {
 #[cfg(test)]
 mod test {
 
+    use std::borrow::Borrow;
+
     use crate::error::ContractError;
     use crate::msg::InstantiateMsg;
-    use crate::state::get_admin;
+    use crate::state::{get_admin, get_managed_balance, get_weights, set_claimed};
     use crate::test_util::{
         get_mocked_balance, mock_contract, set_mocked_cw20_balance, set_mocked_native_balance,
         wasm_query_handler,
@@ -460,5 +488,132 @@ mod test {
                 msg: "unauthorized".into()
             })
         );
+    }
+
+    #[test]
+    fn test_set_new_weights_on_migration() {
+
+        // mock the contract
+        let old_weights = vec![
+            ("addr0000".to_string(), Decimal::percent(10)),
+            ("addr0001".to_string(), Decimal::percent(20)),
+            ("addr0002".to_string(), Decimal::percent(30)),
+            ("addr0003".to_string(), Decimal::percent(40)),
+        ];
+        let init_msg = InstantiateMsg {
+            admin: None,
+            managed_denom: cw_denom::CheckedDenom::Native("uusd".to_string()),
+            weights: old_weights.clone(),
+        };
+        let (mut deps, env) = mock_contract(init_msg).unwrap();
+
+        // set the new weights
+        let new_weights = vec![
+            ("addr0000".to_string(), Decimal::percent(20)),
+            ("addr0001".to_string(), Decimal::percent(30)),
+            ("addr0002".to_string(), Decimal::percent(40)),
+            ("addr0003".to_string(), Decimal::percent(10)),
+        ];
+
+        let msg = super::MigrateMsg {
+            weights: Some(new_weights.clone()),
+        };
+
+        // this should work
+        let res = super::migrate(deps.as_mut(), env.clone(), msg.clone()).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(get_weights(deps.as_ref().storage).unwrap(), new_weights);
+
+
+    }
+
+    #[test]
+    fn test_reject_new_weights_on_migration_if_contract_active() {
+
+        // mock the contract
+        let old_weights = vec![
+            ("addr0000".to_string(), Decimal::percent(10)),
+            ("addr0001".to_string(), Decimal::percent(20)),
+            ("addr0002".to_string(), Decimal::percent(30)),
+            ("addr0003".to_string(), Decimal::percent(40)),
+        ];
+        let init_msg = InstantiateMsg {
+            admin: None,
+            managed_denom: cw_denom::CheckedDenom::Native("uusd".to_string()),
+            weights: old_weights.clone(),
+        };
+        let (mut deps, env) = mock_contract(init_msg).unwrap();
+        let info = mock_info("admin", &[]);
+
+        // new weights
+        let new_weights = vec![
+            ("addr0000".to_string(), Decimal::percent(20)),
+            ("addr0001".to_string(), Decimal::percent(30)),
+            ("addr0002".to_string(), Decimal::percent(40)),
+            ("addr0003".to_string(), Decimal::percent(10)),
+        ];
+        let msg = super::MigrateMsg {
+            weights: Some(new_weights.clone()),
+        };
+
+        // execute the update claims from admin
+        let res = super::execute_update_claims(deps.as_mut(), env.clone(), info).unwrap();
+
+        // this should NOT work as we have active managed balance
+        let res = super::migrate(deps.as_mut(), env.clone(), msg.clone()).unwrap_err();
+        assert_eq!(res, ContractError::Std(cosmwasm_std::StdError::GenericErr {msg: "Cannot migrate to new weights with managed balance".into()}));
+        assert_eq!(get_weights(deps.as_mut().storage).unwrap(), old_weights);
+
+    }
+
+    #[test]
+    fn test_reject_new_weights_on_migration_when_claims_executed() {
+            
+            let old_weights = vec![
+                ("addr0000".to_string(), Decimal::percent(10)),
+                ("addr0001".to_string(), Decimal::percent(20)),
+                ("addr0002".to_string(), Decimal::percent(30)),
+                ("addr0003".to_string(), Decimal::percent(40)),
+            ];
+            // mock the contract
+            let init_msg = InstantiateMsg {
+                admin: None,
+                managed_denom: cw_denom::CheckedDenom::Native("uusd".to_string()),
+                weights: old_weights.clone(),
+            };
+            let (mut deps, env) = mock_contract(init_msg).unwrap();
+            let info = mock_info("admin", &[]);
+    
+            // new weights
+            let new_weights = vec![
+                ("addr0000".to_string(), Decimal::percent(20)),
+                ("addr0001".to_string(), Decimal::percent(30)),
+                ("addr0002".to_string(), Decimal::percent(40)),
+                ("addr0003".to_string(), Decimal::percent(10)),
+            ];
+            let msg = super::MigrateMsg {
+                weights: Some(new_weights.clone()),
+            };
+    
+            // execute the update claims from admin
+            let res = super::execute_update_claims(deps.as_mut(), env.clone(), info).unwrap();
+
+            // let all accounts withdraw to make the claims executed
+            let info = mock_info("addr0000", &[]);
+            super::execute_withdraw(deps.as_mut(), env.clone(), info, "addr0000".to_string()).unwrap();
+            let info = mock_info("addr0001", &[]);
+            super::execute_withdraw(deps.as_mut(), env.clone(), info, "addr0001".to_string()).unwrap();
+            let info = mock_info("addr0002", &[]);
+            super::execute_withdraw(deps.as_mut(), env.clone(), info, "addr0002".to_string()).unwrap();
+            let info = mock_info("addr0003", &[]);
+            super::execute_withdraw(deps.as_mut(), env.clone(), info, "addr0003".to_string()).unwrap();
+
+            // assert managed balance is zero now
+            assert_eq!(get_managed_balance(deps.as_mut().storage).unwrap(), Uint128::zero());
+    
+            // this should NOT work - managed balance is zero but claims have been executed
+            let res = super::migrate(deps.as_mut(), env.clone(), msg.clone()).unwrap_err();
+            assert_eq!(res, ContractError::Std(cosmwasm_std::StdError::GenericErr {msg: "Cannot migrate to new weights with executed claims".into()}));
+            assert_eq!(get_weights(deps.as_mut().storage).unwrap(), old_weights);
     }
 }
