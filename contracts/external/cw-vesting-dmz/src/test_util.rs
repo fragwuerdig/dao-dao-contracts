@@ -10,6 +10,8 @@ use cw20::{BalanceResponse, Cw20QueryMsg};
 
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+
+#[cfg(test)]
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage};
 
 #[cfg(test)]

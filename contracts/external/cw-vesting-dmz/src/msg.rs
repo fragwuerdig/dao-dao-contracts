@@ -34,6 +34,9 @@ pub enum QueryMsg {
 
     #[returns(QueryManagedDenomResponse)]
     Denom {},
+
+    #[returns(QueryWeightsResponse)]
+    Weights {},
 }
 
 #[cw_serde]
@@ -52,6 +55,11 @@ pub struct QueryPendingClaimsResponse {
 pub struct QueryManagedDenomResponse {
     pub managed_denom: CheckedDenom,
     pub amount: Uint128,
+}
+
+#[cw_serde]
+pub struct QueryWeightsResponse {
+    pub weights: Vec<(String, Decimal)>,
 }
 
 #[cw_serde]

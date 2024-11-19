@@ -96,6 +96,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Claimed { address } => query_claimed(deps, address),
         QueryMsg::TotalClaimed {} => Ok(to_json_binary(&get_total_claimed(deps.storage)?)?),
         QueryMsg::Denom {} => query_denom(deps),
+        QueryMsg::Weights {} => Ok(to_json_binary(&get_weights(deps.storage)?)?),
     }
 }
 
@@ -253,6 +254,7 @@ mod test {
         get_mocked_balance, mock_contract, set_mocked_cw20_balance, set_mocked_native_balance,
         wasm_query_handler,
     };
+    use cosmwasm_std::{from_binary, from_json};
     use cosmwasm_std::{
         testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier},
         Addr, BankMsg, Coin, CosmosMsg, Decimal, Env, MemoryStorage, OwnedDeps, Response, Uint128,
@@ -615,5 +617,26 @@ mod test {
             let res = super::migrate(deps.as_mut(), env.clone(), msg.clone()).unwrap_err();
             assert_eq!(res, ContractError::Std(cosmwasm_std::StdError::GenericErr {msg: "Cannot migrate to new weights with executed claims".into()}));
             assert_eq!(get_weights(deps.as_mut().storage).unwrap(), old_weights);
+    }
+
+    #[test]
+    fn test_query_weights_works() {
+        // mock the contract
+        let init_msg = InstantiateMsg {
+            admin: None,
+            managed_denom: cw_denom::CheckedDenom::Native("uusd".to_string()),
+            weights: vec![
+                ("addr0000".to_string(), Decimal::percent(10)),
+                ("addr0001".to_string(), Decimal::percent(20)),
+                ("addr0002".to_string(), Decimal::percent(30)),
+                ("addr0003".to_string(), Decimal::percent(40)),
+            ],
+        };
+        let (mut deps, env) = mock_contract(init_msg.clone()).unwrap();
+
+        // query the weights
+        let res = super::query(deps.as_ref(), env.clone(), super::QueryMsg::Weights {}).unwrap();
+        let weights: Vec<(String, Decimal)> = from_json(&res).unwrap();
+        assert_eq!(weights, init_msg.clone().weights);
     }
 }
