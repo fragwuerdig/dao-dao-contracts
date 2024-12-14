@@ -239,6 +239,7 @@ pub enum QueryMsg {
 pub struct MigrateWithdrawBalance {
     pub amount: Uint128,
     pub recipient: String,
+    pub force: Option<bool>,
 }
 
 #[cw_serde]

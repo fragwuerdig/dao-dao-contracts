@@ -42,8 +42,11 @@ pub fn migrate(
                 .checked_sub(amount)
                 .map_err(|_| ContractError::Std(cosmwasm_std::StdError::GenericErr { msg: "overflow error".to_string() }))?;
 
+            let force = withdraw.force.unwrap_or(false);
+
             // assert the balance is sufficient to fulfill the vest
-            if diff < vest.total() {
+            // except if force is true, then we just take what we can
+            if !force && diff < vest.total() {
                 return Err(ContractError::Std(cosmwasm_std::StdError::GenericErr { msg: "insufficient balance".to_string() }));
             }
 
