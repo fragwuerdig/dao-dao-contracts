@@ -35,7 +35,7 @@ pub enum QueryMsg {
     #[returns(QueryManagedDenomResponse)]
     Denom {},
 
-    #[returns(QueryWeightsResponse)]
+    #[returns(Vec<(String, Decimal)>)]
     Weights {},
 }
 
