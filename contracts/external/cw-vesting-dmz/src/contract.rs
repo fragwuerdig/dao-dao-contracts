@@ -26,7 +26,7 @@ use cw2::set_contract_version;
 const CONTRACT_NAME: &str = "crates.io:cw-vesting-dmz";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point]
+#[cfg_attr(not(feature = "library")), entry_point]
 pub fn migrate(
     deps: DepsMut,
     env: Env,
