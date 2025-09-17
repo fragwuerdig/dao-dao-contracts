@@ -10,6 +10,10 @@ version = { workspace = true }
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
 [dependencies]
 cosmwasm-schema = { workspace = true }
 cosmwasm-std = { workspace = true }
