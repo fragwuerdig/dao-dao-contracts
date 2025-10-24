@@ -8,11 +8,7 @@ use crate::msg::{
     QueryPendingClaimsResponse, MigrateMsg,
 };
 use crate::state::{
-    add_balance, add_claimed, assert_admin, get_admin, get_balance, get_balances, get_claimed,
-    get_current_balance, get_managed_balance, get_managed_denom, get_max_balance_account,
-    get_total_claimed, get_weights, reduce_balance, reduce_managed_balance, set_admin,
-    set_managed_balance, set_managed_denom, set_weights, sum_balances, validate_admin,
-    validate_weights,
+    add_balance, add_claimed, assert_admin, get_admin, get_balance, get_balances, get_claimed, get_current_balance, get_managed_balance, get_managed_denom, get_max_balance_account, get_total_claimed, get_weight, get_weights, reduce_balance, reduce_managed_balance, set_admin, set_managed_balance, set_managed_denom, set_weights, sum_balances, validate_admin, validate_weights
 };
 use crate::util::split_number_with_weights;
 #[cfg(not(feature = "library"))]
@@ -26,7 +22,7 @@ use cw2::set_contract_version;
 const CONTRACT_NAME: &str = "crates.io:cw-vesting-dmz";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(
     deps: DepsMut,
     env: Env,
@@ -97,6 +93,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::TotalClaimed {} => Ok(to_json_binary(&get_total_claimed(deps.storage)?)?),
         QueryMsg::Denom {} => query_denom(deps),
         QueryMsg::Weights {} => Ok(to_json_binary(&get_weights(deps.storage)?)?),
+        QueryMsg::Weight { address } => Ok(to_json_binary(&get_weight(deps.storage, address)?)?)
     }
 }
 

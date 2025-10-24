@@ -1,6 +1,19 @@
 #! /bin/bash
 
-docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/optimizer:0.15.0
+set -e
+
+rm -Rf artifacts
+mkdir artifacts
+cargo build --package cw-vesting-dmz --release --target wasm32-unknown-unknown
+
+mv target/wasm32-unknown-unknown/release/*.wasm artifacts/
+rm -Rf target
+for i in $BLACKLIST; do
+    rm -f artifacts/$i.wasm
+done
+
+cd artifacts
+mkdir -p opt
+for i in *.wasm; do
+    wasm-opt -Os --strip-debug $i -o opt/$i
+done
