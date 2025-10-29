@@ -37,6 +37,9 @@ pub enum QueryMsg {
 
     #[returns(Vec<(String, Decimal)>)]
     Weights {},
+
+    #[returns(Decimal)]
+    Weight { address: String },
 }
 
 #[cw_serde]
